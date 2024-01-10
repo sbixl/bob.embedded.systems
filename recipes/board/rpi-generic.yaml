@@ -1,4 +1,15 @@
 depends:
+    # host tools
+    - name: utils::mtools
+      use: [tools]
+      tools: 
+        target-toolchain: host-toolchain
+    - name: board::bsp::rpi::u-boot-tools
+      use: [tools]
+      tools: 
+        target-toolchain: host-toolchain
+        
+    # images
     - board::bsp::rpi::u-boot-image
     -
         name: board::bsp::rpi::linux-image
@@ -7,7 +18,130 @@ depends:
     # rootfs
     - board::bsp::rpi::linux-modules    
     - board::rootfs
- 
-buildScript: |
 
+buildVars: [ARCH, LINUX_VERSION]
+buildScript: |
+    rm -rf *
+    mkdir -p rootfs boot
+
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::u-boot-image"]}/boot/* boot   
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/* boot
+    rsync -ra ${BOB_DEP_PATHS["board::rootfs"]}/* rootfs
+
+    cat > config.txt << EOF
+    # load a custom kernel image
+    kernel=kernel.img
+    kernel=u-boot.bin
+    # required for u-boot
+    device_tree_address=0x100
+    device_tree_end=0x8000
+    # disable rainbow splash screen
+    disable_splash=1
+    # enable serial console
+    enable_uart=1
+    EOF
+
+    if [ "arm64" == ${ARCH} ] ; then
+      echo '# 64bit-mode' >> config.txt
+      echo 'arm_64bit=1' >> config.txt
+    fi
+
+    # dsiable raspberry pi logo
+    cat > cmdline.txt << EOF
+    dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait logo.nologo
+    EOF
+
+    # copy kernel modules
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-modules"]}/lib/modules/* rootfs/lib/modules
+
+    # configure kernel module dependencies
+    pushd rootfs/lib/modules
+    VERSION=$(ls -d ${LINUX_VERSION}*)
+    popd
+    /sbin/depmod -b rootfs -C rootfs/etc/depmod.d ${VERSION}
+
+packageVars: [ARCH, BOARD_KERNEL_DTB]
+packageTools: [mcopy, mkimage]
 packageScript: |
+    # first create the boot partiton image file
+    fallocate -l 50M boot.img
+    # make a vfat file system (FAT32) out of the nacked image file
+    mkfs.vfat -F 32 boot.img
+
+    # create the second rootfs partiton image file
+    fallocate -l 130M rootfs.img
+    # make a ext4  file system out of the nacked image file
+    mkfs.ext4 -d $1/rootfs rootfs.img
+
+    # create the full sd card image file
+    fallocate -l 190M sd-image.img
+
+    # prepare uimage for sd card boot
+    # ATTENTION: https://raspberrypi.stackexchange.com/questions/68165/rpi3-buildroot-u-boot
+    cat > rpi3-bootscript.txt << EOF
+    mmc dev 0
+    fatload mmc 0:1 \${kernel_addr_r} kernel.img
+    fatload mmc 0:1 0x2000000 ${BOARD_KERNEL_DTB}.dtb
+    setenv bootargs 8250.nr_uarts=1 console=ttyS0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait logo.nologo dwc_otg.lpm_enable=0
+    EOF
+
+    if [ "arm64" == ${ARCH} ] ; then
+       echo 'booti ${kernel_addr_r} - 0x2000000' >> rpi3-bootscript.txt
+    else
+       echo 'bootz ${kernel_addr_r} - 0x2000000' >> rpi3-bootscript.txt
+    fi
+
+    mkimage -A ${ARCH} -O linux -T script -d rpi3-bootscript.txt boot.scr
+
+    # We use the mtools here because they can easy copy files from host filesystem to a target vfat image file
+    # copy file XXX from $1/boot into root directory "::" of vfat image boot.img
+    mcopy -i boot.img $1/boot/dtbs/$LINUX_VERSION/broadcom/${BOARD_KERNEL_DTB}.dtb ::${BOARD_KERNEL_DTB}.dtb
+    mcopy -i boot.img $1/boot/bootcode.bin ::bootcode.bin
+    mcopy -i boot.img $1/config.txt ::config.txt
+    mcopy -i boot.img $1/cmdline.txt ::cmdline.txt
+    mcopy -i boot.img $1/boot/fixup4.dat ::fixup4.dat
+    mcopy -i boot.img $1/boot/kernel.img ::kernel.img
+    mcopy -i boot.img $1/boot/start4.elf ::start4.elf
+    mcopy -o -i boot.img $1/boot/u-boot.bin ::u-boot.bin
+    mcopy -o -i boot.img boot.scr ::boot.scr
+
+
+    # Units: sectors of 1 * 512 = 512 bytes
+    # Sector size (logical/physical): 512 bytes / 512 bytes
+    # I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+    # create partions
+    # 0 8192 Sectors = 8192 / 512 = 16 MByte for MBR
+    # 1 Partion: W95 FAT32 --> starts after MBR section from 8192 and ends @ 50 MB --> ((50 * 1024 *1024) Byte / 512 Byte) = 102400
+    # 2 Partion: Linux     --> starts after FAT Partion on section (8192 + 102400 = 110592) with a size of 130 MB
+    cat > sfdisk.script <<EOF
+    8192,50M,0xC,-
+    110592,130M,0x83,-
+    EOF
+
+    sfdisk sd-image.img < sfdisk.script
+
+    # At the end copy the partions to the full image (use the seek property to move the start position in the
+    # output file to the correct position where the partions really starts, see sfdisk script / the consequent
+    # partiton table).
+    dd if=boot.img of=sd-image.img bs=512 seek=8192
+    dd if=rootfs.img of=sd-image.img bs=512 seek=110592
+
+    # write image to sd card e.g.:
+    # 'sudo dd if=sd-image.img of=/dev/sde status=progress '
+    #
+    # you can check if the partion becomes successfull applied ony your sd card image when typing:
+    # 'sudo lsblk -o  NAME,FSTYPE,UUID,RO,RM,SIZE,STATE,MOUNTPOINT'
+    # output e.g.:
+    # sde 0  1  29,7G running
+    # ├─sde1 vfat     28E1-ED66                             0  1    20M
+    # └─sde2 ext4     ea469f15-c29a-4e04-aeef-2c2d2dcb353a  0  1    30M
+
+    # cleanup
+    rm boot.img
+    rm rootfs.img
+    rm sfdisk.script
+    #rm rpi3-bootscript.txt
+    rm boot.scr
+ 
