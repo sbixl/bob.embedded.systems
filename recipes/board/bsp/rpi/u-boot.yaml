@@ -62,9 +62,7 @@ multiPackage:
         buildTools: [bison, flex, host-toolchain]
         buildScript: |
             mkdir -p build install
-            pushd build
             makeParallel -C $1 O=$PWD PREFIX=$PWD/../install/usr tools-only NO_SDL=1
-            popd
 
         packageScript: |
             mkdir -p usr/bin
