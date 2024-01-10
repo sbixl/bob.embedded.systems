@@ -1,0 +1,24 @@
+depends:
+   - core::busybox
+
+buildScript: |
+   rm -rf tmp
+   mkdir -p tmp
+
+   # add default directories and special files
+   pushd tmp
+   mkdir -p dev/pts 
+   mkdir -p etc/init.d 
+   mkdir lib 
+   mkdir mnt 
+   mkdir opt 
+   mkdir proc 
+   mkdir oot 
+   mkdir sys 
+   mkdir mp 
+   mkdir -p var/log
+   popd
+
+packageScript: |
+   cp -anur $1/tmp/* .
+

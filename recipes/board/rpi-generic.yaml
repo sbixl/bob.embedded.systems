@@ -6,7 +6,8 @@ depends:
     
     # rootfs
     - board::bsp::rpi::linux-modules    
-
+    - board::rootfs
+ 
 buildScript: |
 
 packageScript: |
