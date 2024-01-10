@@ -1,8 +1,15 @@
+environment:
+    BOARD_KERNEL: "bcm2711"
+    BOARD_CUSTOM_CONFIG: "bcm2711min_defconfig"
+
 multiPackage:
     "":
-        buildScript: |
-            
+        buildScript: |            
         packageScript: |
+
+        provideVars:
+            BOARD_KERNEL: "${BOARD_KERNEL}"
+            BOARD_CUSTOM_CONFIG: "${BOARD_CUSTOM_CONFIG}"
 
         multiPackage:
             32-bit:

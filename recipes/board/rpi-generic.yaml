@@ -1,5 +1,8 @@
 depends:
     - board::bsp::rpi::u-boot-image
+    -
+        name: board::bsp::rpi::linux-image
+        use: [environment, result]    
 
 buildScript: |
 
