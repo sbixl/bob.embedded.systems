@@ -1,0 +1,22 @@
+inherit: [autotools]
+
+metaEnvironment:
+    PKG_VERSION: "4.0.23"
+
+checkoutSCM:
+    scm: url
+    url: http://ftp.gnu.org/gnu/mtools/mtools-${PKG_VERSION}.tar.gz
+    digestSHA256: "110881884bb447b6243471dab4def937a344267a05ccc60a13503065ac992c39"
+
+buildVars: [PKG_VERSION, CONFIG_OPTIONS,LIBDIR]
+buildScript: |
+    rsync -a --delete $1/mtools-${PKG_VERSION}/ ${PWD}
+    autotoolsBuild ${PWD}
+
+packageScript:
+    autotoolsPackageTgt
+
+provideTools:
+       mcopy:
+            path: "usr/bin"
+
