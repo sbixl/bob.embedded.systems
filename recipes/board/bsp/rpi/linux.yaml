@@ -1,0 +1,124 @@
+# Raspberry Pi Linux kernel recipe that builds the kernel, modules and device
+# trees. By default the defconfig of the architecture is built. 
+# To use a custom defconfig create a package board::config-kernelconfig and
+# set BOARD_CUSTOM_CONFIG to the name of your custom defconfig file.
+
+inherit: [make]
+
+metaEnvironment:
+    KERNEL_VERSION: "6.1.63"
+
+depends:
+    - if: "${BOARD_CUSTOM_CONFIG:-}"
+      name: board::config-kernelconfig
+
+checkoutSCM:
+    scm: url
+    url: https://github.com/raspberrypi/linux/archive/refs/tags/stable_20231123.tar.gz
+    digestSHA256: "ebbc27e1870f4069a3ee1b9ff67b0896bcc8333baec80c2234c646365faeb2e1"
+    stripComponents: 1
+
+buildTools: [bison, flex, host-toolchain]
+buildVars: [ARCH, BOARD_KERNEL, BOARD_CUSTOM_CONFIG]
+buildScript: |
+    # prevent timestamps in configuration
+    export KCONFIG_NOTIMESTAMP=1
+    export KBUILD_BUILD_TIMESTAMP='Mon Dec 28 22:49:40 CET 2015'
+
+    if [ "bcmrpi" == ${BOARD_KERNEL} ] ; then
+        # For Raspberry Pi 1, Zero and Zero W, and Raspberry Pi Compute Module 1 default (32-bit only) build configuration
+        KERNEL=kernel
+    elif [ "bcm2709" == ${BOARD_KERNEL} ] ; then
+        # For Raspberry Pi 2, 3, 3+ and Zero 2 W, and Raspberry Pi Compute Modules 3 and 3+ default 32-bit build configuration
+        KERNEL=kernel7
+    elif [ "bcm2711" == ${BOARD_KERNEL} ] ; then
+        if [ "arm" == ${ARCH} ] ; then
+            # For Raspberry Pi 4 and 400, and Raspberry Pi Compute Module 4 default 32-bit build configuration
+            KERNEL=kernel7l
+         elif [ "arm64" == ${ARCH} ] ; then
+            # For Raspberry Pi 3, 3+, 4, 400 and Zero 2 W, and Raspberry Pi Compute Modules 3, 3+ and 4 default 64-bit build configuration
+            KERNEL=kernel8 
+        fi
+    else
+       echo "Unsupported BOARD_KERNEL = ${BOARD_KERNEL}"
+    fi
+
+    if [[ ${BOARD_CUSTOM_CONFIG:+true} ]] ; then
+        # use custom kernel configuration from configuration package
+        cp -u "${BOB_DEP_PATHS[board::config-kernelconfig]}/${ARCH}/$BOARD_CUSTOM_CONFIG" ".config"
+        make -C "$1" O=$PWD olddefconfig
+    else
+        if [[ ! -e ".config" ]] ; then
+            # use defconfig provided by the kernel sources
+            make -C "$1" O=$PWD ${BOARD_KERNEL}_defconfig 
+        fi
+    fi
+
+multiPackage:
+    "":
+        inherit: [pkg-config]
+        depends:
+            - tools:
+                target-toolchain: host-toolchain
+              depends:
+                - libs::openssl-dev
+                - name: kernel::kmod
+                  use: [tools]
+
+        buildTools: [target-toolchain]
+        buildVars: [CROSS_COMPILE]
+        buildScript: |
+            makeParallel
+
+        multiPackage:
+            image:
+                packageVars: [KERNEL_VERSION]
+                packageScript: |
+                    mkdir -p boot
+
+                    if [ "arm64" == ${ARCH} ] ; then
+                        cp $1/arch/${ARCH}/boot/Image boot/ḱernel.img
+                    else
+                        cp $1/arch/${ARCH}/boot/zImage boot/ḱernel.img
+                    fi
+                    
+                    cp "$1/System.map" "boot/System.map-$KERNEL_VERSION"
+                    cp "$1/.config" "boot/config-$KERNEL_VERSION"
+
+                    if [[ -d "$1/arch/$ARCH/boot/dts" ]] ; then
+                        make -C "$1" INSTALL_DTBS_PATH="$PWD/boot/dtbs/$KERNEL_VERSION" dtbs_install
+                    fi
+
+            modules:
+                packageToolsWeak: [kmod]
+                packageVars: [KERNEL_VERSION, OBJCOPY]
+                packageScript: |
+                    make -C "$1" INSTALL_MOD_PATH="$PWD" modules_install
+                    pushd lib/modules
+                    VERSION=$(ls -d ${KERNEL_VERSION}*)
+                    popd
+                    rm lib/modules/"${VERSION}"/{build,source}
+
+                    # Strip all modules. Shamelessly ripped from builddeb...
+                    for module in $(find lib/modules/ -name *.ko -printf '%P\n'); do
+                        module=lib/modules/$module
+                        mkdir -p $(dirname usr/lib/debug/$module)
+                        # strip original module from debug symbols
+                        $OBJCOPY --strip-debug $module
+                    done
+
+                    depmod -b "$PWD" "$VERSION"
+                 
+    # This package is only for other recipes that need special kernel headers
+    # that are not available in the generic toolchain. Depending on this
+    # package should only be needed if you have a custom kernel with
+    # added/modified driver headers. It will make your package dependent on
+    # this kernel and it's particular configuration!
+    headers:
+        buildScript: |
+            make headers_install
+        packageScript: |
+            cp -a $1/usr .
+
+provideVars:
+    LINUX_VERSION: "$KERNEL_VERSION"
