@@ -3,6 +3,9 @@ depends:
     -
         name: board::bsp::rpi::linux-image
         use: [environment, result]    
+    
+    # rootfs
+    - board::bsp::rpi::linux-modules    
 
 buildScript: |
 
