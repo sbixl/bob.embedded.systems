@@ -1,0 +1,26 @@
+inherit: [autotools]
+
+metaEnvironment:
+    PKG_VERSION: "2022.83"
+
+depends:
+    - libs::zlib-dev
+    - use: []
+      depends:
+        - libs::zlib-tgt
+
+checkoutSCM:
+    scm: url
+    url: https://github.com/mkj/dropbear/archive/refs/tags/DROPBEAR_$PKG_VERSION.tar.gz
+    digestSHA256: "e02c5c36eb53bfcd3f417c6e40703a50ec790a1a772269ea156a2ccef14998d2"
+    stripComponents: 1
+
+buildVars: [PKG_VERSION]
+buildScript: |
+buildScript: |
+    tar -xf $1/DROPBEAR_${PKG_VERSION}.tar.gz --strip-components=1
+    export MULTI=1 PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp"
+    autotoolsBuild $1
+
+packageScript: |
+    autotoolsPackageTgt

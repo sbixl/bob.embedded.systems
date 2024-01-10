@@ -1,5 +1,6 @@
 depends:
    - core::busybox
+   - net::dropbear
 
 buildScript: |
    rm -rf tmp
