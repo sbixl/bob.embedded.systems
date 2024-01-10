@@ -1,3 +1,6 @@
+depends:
+    - board::bsp::rpi::u-boot-image
+
 buildScript: |
 
 packageScript: |
