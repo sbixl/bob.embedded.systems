@@ -1,0 +1,28 @@
+inherit: [autotools, autoconf]
+
+metaEnvironment:
+    PKG_VERSION: "3.2.2"
+
+depends:
+    - libs::ncurses-dev
+    - use: []
+      depends:
+        - libs::ncurses-tgt
+
+provideDeps: ["*-tgt"]
+checkoutSCM:
+    scm: url
+    url: https://github.com/htop-dev/htop/archive/refs/tags/$PKG_VERSION.tar.gz
+    digestSHA256: "3829c742a835a0426db41bb039d1b976420c21ec65e93b35cd9bfd2d57f44ac8"
+    stripComponents: 1
+
+checkoutDeterministic: True
+checkoutScript: |
+    autoconfReconfigure
+
+buildVars: [PKG_VERSION]
+buildScript: |
+    autotoolsBuild $1 --disable-unicode
+
+packageScript: |
+    autotoolsPackageTgt
