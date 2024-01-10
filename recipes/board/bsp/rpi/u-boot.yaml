@@ -1,0 +1,75 @@
+inherit: [make]
+
+metaEnvironment:
+    PKG_VERSION: "v2024.01"
+
+checkoutSCM:
+-
+    scm: url
+    url: https://github.com/u-boot/u-boot/archive/refs/tags/${PKG_VERSION}.tar.gz
+    digestSHA256: "a03c3c2ba9d2bea5176c6406f1f3429a79e1147be242f5a07dbd9e89b3cc83c4"
+    stripComponents: 1
+
+buildTools: [bison, flex, host-toolchain]
+buildVars: [ARCH] 
+buildScript: |
+    if [ ! -e include/config.h ] ; then
+        # set correct configuration for 32 or 64 bit build
+        case "$ARCH" in
+            arm)
+                make -C $1 O=$PWD "rpi_4_32b_defconfig"
+                ;;
+            arm64)
+                make -C $1 O=$PWD "rpi_4_defconfig"
+                ;;
+            *)
+                make -C $1 O=$PWD tools-only_defconfig NO_SDL=1
+                ;;
+        esac
+    fi
+
+multiPackage:
+    image:  
+        depends:
+            - board::bsp::rpi::firmware
+
+        buildTools: [target-toolchain]
+        buildVars: [CROSS_COMPILE] 
+        buildScript: |
+            makeParallel -C $1 O=$PWD
+
+            mkdir -p install/firmware
+            pushd install/firmware
+            # get closed source (minimal) bootloader firmware binaries
+            cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/bootcode.bin .
+            cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/start4.elf .
+            # optional: used to configure the SDRAM partition between GPU and CPU
+            cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/fixup4.dat .
+            cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/LICENCE.broadcom .
+            cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/COPYING.linux  .
+            popd
+
+        packageScript: |
+            mkdir -p .debug boot
+            cp -au $1/u-boot .debug
+            pushd boot
+            cp -anu $1/u-boot.bin .
+            cp -anu $1/install/firmware/* .
+            popd
+
+    tools:
+        # TODO: needs swig, libssl-dev, uuid-dev, libgnutls28-dev as dependency (must currently installed local)
+        buildTools: [bison, flex, host-toolchain]
+        buildScript: |
+            mkdir -p build install
+            pushd build
+            makeParallel -C $1 O=$PWD PREFIX=$PWD/../install/usr tools-only NO_SDL=1
+            popd
+
+        packageScript: |
+            mkdir -p usr/bin
+            cp -au $1/tools/mkimage usr/bin
+
+        provideTools:
+            mkimage:
+                path: "usr/bin"
