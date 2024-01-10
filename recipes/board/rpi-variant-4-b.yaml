@@ -1,0 +1,24 @@
+multiPackage:
+    "":
+        buildScript: |
+            
+        packageScript: |
+
+        multiPackage:
+            32-bit:
+                depends:
+                    -    
+                        name: devel::cross-toolchain-arm-linux-gnueabihf
+                        use: [tools, environment]
+                        forward: True
+
+                    -  board::rpi-generic
+
+            64-bit:
+                depends:
+                    -    
+                        name: devel::cross-toolchain-aarch64-linux-gnu
+                        use: [tools, environment]
+                        forward: True
+
+                    -  board::rpi-generic

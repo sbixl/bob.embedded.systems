@@ -1,0 +1,3 @@
+depends:
+   - board::rpi-variant-4-b-32-bit
+   - board::rpi-variant-4-b-64-bit
