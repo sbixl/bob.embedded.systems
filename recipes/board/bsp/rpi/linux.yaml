@@ -77,9 +77,9 @@ multiPackage:
                     mkdir -p boot
 
                     if [ "arm64" == ${ARCH} ] ; then
-                        cp $1/arch/${ARCH}/boot/Image boot/ḱernel.img
+                        cp $1/arch/${ARCH}/boot/Image boot/kernel.img
                     else
-                        cp $1/arch/${ARCH}/boot/zImage boot/ḱernel.img
+                        cp $1/arch/${ARCH}/boot/zImage boot/kernel.img
                     fi
                     
                     cp "$1/System.map" "boot/System.map-$KERNEL_VERSION"
