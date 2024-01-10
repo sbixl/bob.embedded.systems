@@ -1,0 +1,5 @@
+.bob-*
+__pycache__/
+dev
+build
+projects
