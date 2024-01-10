@@ -1,0 +1,11 @@
+checkoutSCM:
+-
+    scm: import
+    url: recipes/board/config
+    
+multiPackage:
+    kernelconfig:
+        buildScript: |
+            rsync -a --delete $1/kernel/* .
+        packageScript: |
+            cp -a $1/* .
