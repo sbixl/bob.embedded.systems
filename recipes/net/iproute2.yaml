@@ -1,0 +1,44 @@
+inherit: [autotools]
+
+metaEnvironment:
+    PKG_VERSION: "6.7.0"
+
+checkoutSCM:
+    scm: url
+    url: https://github.com/iproute2/iproute2/archive/refs/tags/v${PKG_VERSION}.tar.gz
+    digestSHA256: "81c7425423d520227b060de9fdecf236ee33f563e71dd4712c729449bd75cf8f"
+    stripComponents: 1
+
+buildTools: [bison, flex]
+buildVars: [CROSS_COMPILE, CC, LD]
+buildScript: |
+    rm -rf install
+    mkdir -p build install
+    
+    pushd build
+    rsync -aH --delete $1/ .
+
+    if [[ configure -nt .configure.stamp ]] ; then
+        $1/configure \
+            ${AUTOCONF_BUILD:+--build=${AUTOCONF_BUILD}} \
+            ${AUTOCONF_HOST:+--host=${AUTOCONF_HOST}} \
+            ${AUTOCONF_TARGET:+--target=${AUTOCONF_TARGET}} \
+            --prefix="/usr" \
+            --sysconfdir="/etc" \
+            --localstatedir="/var" \
+            --libdir=/usr/lib \
+            ${SHARED_STATIC:+"${SHARED_STATIC[@]}"} \
+            --color=never \
+            --include_dir=/usr/include \
+            --libbpf_dir=/usr/lib \
+            --libbpf_force=off
+        touch .configure.stamp
+    fi
+
+    make config.mk
+    makeParallel
+    make install SBINDIR=/usr/sbin DESTDIR=${PWD}/../install
+    popd
+
+packageScript: |
+    autotoolsPackageTgt

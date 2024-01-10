@@ -1,6 +1,7 @@
 depends:
    - core::busybox
    - net::dropbear
+   - net::iproute2 
 
 buildScript: |
    rm -rf tmp
