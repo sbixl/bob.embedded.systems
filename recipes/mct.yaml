@@ -1,0 +1,95 @@
+inherit: [ "basement::rootrecipe" ]
+
+environment:
+    BOARD_KERNEL:                    "bcm2711"
+    BOARD_KERNEL_DTB:         "bcm2711-rpi-4-b"    
+    BOARD_CUSTOM_CONFIG: "bcm2711min_defconfig"
+
+
+provideVars:
+    BOARD_KERNEL: "${BOARD_KERNEL}"
+    BOARD_KERNEL_DTB: "${BOARD_KERNEL_DTB}"
+    BOARD_CUSTOM_CONFIG: "${BOARD_CUSTOM_CONFIG}"
+
+depends:
+    # host tools
+    - 
+        name: utils::mtools
+        use: [tools]
+        tools:
+            target-toolchain: host-toolchain
+    - 
+        name: board::bsp::rpi::u-boot-tools
+        use: [tools]
+        tools: 
+            target-toolchain: host-toolchain
+    -    
+        name: devel::cross-toolchain-aarch64-linux-gnu
+        use: [tools, environment]
+        forward: True
+    -
+        name: board::bsp::rpi::linux-image
+        use: [environment, result]
+    -   board::bsp::rpi::firmware
+
+buildVars: [ARCH, LINUX_VERSION]
+buildScript: |
+    mkdir -p boot
+
+    # install minimal bootloader binaries from rpi-firmware
+    pushd boot
+    # get closed source (minimal) bootloader firmware binaries
+    cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/bootcode.bin .
+    cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/start4.elf .
+    # optional: used to configure the SDRAM partition between GPU and CPU
+    cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/fixup4.dat .
+    popd
+
+    # install kernel
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/kernel.img boot/
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/* linux/
+
+    # create config.txt
+    cat > boot/config.txt << EOF
+    start_file=start4.elf
+    fixup_file=fixup4.dat
+
+    kernel=kernel.img
+
+    # How much memory in MB to assign to the GPU on Pi models having
+    # 256, 512 or 1024 MB total memory
+    gpu_mem_256=100
+    gpu_mem_512=100
+    gpu_mem_1024=100
+
+    # fixes rpi (3B, 3B+, 3A+, 4B and Zero W) ttyAMA0 serial console
+    dtoverlay=miniuart-bt
+    # use UART2 for communication with real-time system (microcontroller)
+    dtoverlay=uart2
+
+    # enable 64bits support
+    arm_64bit=1
+    EOF
+
+    # kernel cmdline
+    cat > boot/cmdline.txt << EOF
+    console=tty1 console=ttyAMA0,115200
+    EOF
+
+packageVars: [ARCH, BOARD_KERNEL_DTB]
+packageTools: [mcopy, mkimage]
+packageScript: |
+    # first create the boot partiton image file
+    fallocate -l 200M boot.img
+    # make a vfat file system (FAT32) out of the empty image file
+    mkfs.vfat -F 32 boot.img
+
+    # We use the mtools here because they can easy copy files from host filesystem to a target vfat image file
+    # copy file XXX from $1/boot into root directory "::" of vfat image boot.img
+    mcopy -i boot.img $1/linux/dtbs/$LINUX_VERSION/broadcom/${BOARD_KERNEL_DTB}.dtb ::${BOARD_KERNEL_DTB}.dtb
+    mcopy -i boot.img $1/boot/bootcode.bin ::bootcode.bin
+    mcopy -i boot.img $1/boot/config.txt ::config.txt
+    mcopy -i boot.img $1/boot/cmdline.txt ::cmdline.txt
+    mcopy -i boot.img $1/boot/fixup4.dat ::fixup4.dat
+    mcopy -i boot.img $1/boot/kernel.img ::kernel.img
+    mcopy -i boot.img $1/boot/start4.elf ::start4.elf
