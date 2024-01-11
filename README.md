@@ -1,22 +1,29 @@
 # bob.embedded.systems
 
-minimum: Ubuntu 23.10 because of glibc support min 2.36 in basement layer of bob
+To check out this project, clone with submodules (for basement layers):
 
-sudo apt install python3-pip python3-venv git
+```
+git clone --recurse-submodules https://github.com/sbixl/bob.embedded.systems.git
+```
 
-mkdir -p ~/tools/bob
-cd ~/tools/bob
-python3 -m venv .
-python3 -m pip install BobBuildTool
+As the environment for Bob, a Vagrantfile is provided which will create a
+virtual machine with ubuntu 23.10 and install bob. The git repo is shared
+between the host and the virtual machine and the Bob project is built in the
+home directory but the recipes are in the shared folder (see `bob init`).
+Install Vagrant and VirtualBox and then run (if a password is required, it is `vagrant`):
 
-source ~/tools/bob/bin/activate
-bob --version
+```
+vagrant up
+vagrant ssh
+```
 
-git clone https://github.com/sbixl/bob.embedded.systems.git --recurse-submodules
-cd bob.embedded.systems
+You should get a shell in the VM and be able to run any bob commands on the project immediately.
 
-sudo apt install m4 swig libssl-dev uuid-dev libgnutls28-de
+*Note: Ubuntu 23.10 is required because glibc > 2.36 is required by the basement
+layer of bob.*
 
-Note: swig, libssl-dev, uuid-dev and libgnutls28-de are required to build the u-boot tools (should be added as recipes in future)
+Build the project with:
 
+```
 bob dev sbc/board::rpi/board::rpi-variant-4-b-64-bit -v
+```
