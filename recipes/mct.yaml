@@ -3,7 +3,7 @@ inherit: [ "basement::rootrecipe" ]
 environment:
     BOARD_KERNEL:           "bcm2711"
     BOARD_KERNEL_DTB:       "bcm2711-rpi-4-b"    
-    BOARD_CUSTOM_CONFIG:    "bcm2711min_defconfig"
+    BOARD_CUSTOM_CONFIG:    "mct"
 
 provideVars:
     BOARD_KERNEL:           "${BOARD_KERNEL}"
@@ -17,11 +17,6 @@ depends:
         use: [tools]
         tools:
             target-toolchain: host-toolchain
-    - 
-        name: board::bsp::rpi::u-boot-tools
-        use: [tools]
-        tools: 
-            target-toolchain: host-toolchain
     -    
         name: devel::cross-toolchain-aarch64-linux-gnu
         use: [tools, environment]
@@ -33,7 +28,6 @@ depends:
     -   board::rootfs
 
 buildVars: [ARCH, LINUX_VERSION]
-buildTools: [mkimage]
 buildScript: |
     mkdir -p boot
 
@@ -80,7 +74,7 @@ buildScript: |
     console=tty1 console=ttyAMA0,115200 initrd=/dev/ram0
     EOF
 
-    # rootfs
+    # rootfs: create a initramfs from the rootfs
     (
         cd ${BOB_DEP_PATHS["board::rootfs"]}
         find . | sort | cpio --create --reproducible --format=newc --owner=root:root | gzip

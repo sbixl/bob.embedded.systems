@@ -25,5 +25,5 @@ layer of bob.*
 Build the project with:
 
 ```
-bob dev sbc/board::rpi/board::rpi-variant-4-b-64-bit -v
+bob dev mct -v
 ```
