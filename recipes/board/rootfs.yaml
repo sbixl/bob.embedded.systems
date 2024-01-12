@@ -1,6 +1,7 @@
 depends:
     - libs::libc-tgt
     - core::busybox
+    - utils::afetch
 
 buildScript: |
     mkdir -p bin dev etc lib mnt proc sbin sys tmp var
@@ -16,6 +17,11 @@ buildScript: |
     echo -n $<'initramfs/inittab'> >etc/inittab
     cp $<<initramfs/rcS>> etc/init.d/rcS
     chmod 0755 etc/init.d/rcS
+
+    cat > etc/os-release << EOF
+    NAME="Bob RPi Linux"
+    ID=linux
+    EOF
 
 packageScript: |
     cp -a $1/* .

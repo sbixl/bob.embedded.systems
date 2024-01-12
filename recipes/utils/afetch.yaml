@@ -1,0 +1,22 @@
+inherit: [make]
+
+metaEnvironment:
+    PKG_VERSION: "2.2.0"
+
+checkoutSCM:
+    scm: url
+    url: https://github.com/13-CF/afetch/archive/refs/tags/V$PKG_VERSION.tar.gz
+    stripComponents: 1
+
+checkoutDeterministic: True
+
+buildTools: [target-toolchain]
+buildVars: [CC, CFLAGS, LDFLAGS]
+buildScript: |
+    cp -r $1/* .
+
+    makeParallel -C .
+
+packageScript: |
+    mkdir -p bin/
+    cp $1/afetch bin/

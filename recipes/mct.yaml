@@ -1,15 +1,14 @@
 inherit: [ "basement::rootrecipe" ]
 
 environment:
-    BOARD_KERNEL:                    "bcm2711"
-    BOARD_KERNEL_DTB:         "bcm2711-rpi-4-b"    
-    BOARD_CUSTOM_CONFIG: "bcm2711min_defconfig"
-
+    BOARD_KERNEL:           "bcm2711"
+    BOARD_KERNEL_DTB:       "bcm2711-rpi-4-b"    
+    BOARD_CUSTOM_CONFIG:    "bcm2711min_defconfig"
 
 provideVars:
-    BOARD_KERNEL: "${BOARD_KERNEL}"
-    BOARD_KERNEL_DTB: "${BOARD_KERNEL_DTB}"
-    BOARD_CUSTOM_CONFIG: "${BOARD_CUSTOM_CONFIG}"
+    BOARD_KERNEL:           "${BOARD_KERNEL}"
+    BOARD_KERNEL_DTB:       "${BOARD_KERNEL_DTB}"
+    BOARD_CUSTOM_CONFIG:    "${BOARD_CUSTOM_CONFIG}"
 
 depends:
     # host tools
