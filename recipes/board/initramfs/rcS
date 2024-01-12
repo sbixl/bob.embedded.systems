@@ -1,0 +1,6 @@
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+mdev -s
+
+echo "Hello World!"

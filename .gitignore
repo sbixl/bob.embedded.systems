@@ -3,3 +3,6 @@ __pycache__/
 dev
 build
 projects
+.vagrant/
+*.sublime-*
+*.img

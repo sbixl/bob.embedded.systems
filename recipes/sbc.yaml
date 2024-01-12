@@ -1,4 +1,0 @@
-inherit: [ "basement::rootrecipe" ]
-
-depends:
-   - board::rpi
