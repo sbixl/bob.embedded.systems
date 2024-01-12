@@ -31,10 +31,18 @@ depends:
         name: board::bsp::rpi::linux-image
         use: [environment, result]
     -   board::bsp::rpi::firmware
+    -   board::rootfs
 
 buildVars: [ARCH, LINUX_VERSION]
+buildTools: [mkimage]
 buildScript: |
     mkdir -p boot
+
+    # install kernel
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/kernel.img boot/
+    
+    # copy device tree files
+    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/dtbs/ dtbs/
 
     # install minimal bootloader binaries from rpi-firmware
     pushd boot
@@ -45,16 +53,13 @@ buildScript: |
     cp ${BOB_DEP_PATHS["board::bsp::rpi::firmware"]}/boot/fixup4.dat .
     popd
 
-    # install kernel
-    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/kernel.img boot/
-    rsync -a ${BOB_DEP_PATHS["board::bsp::rpi::linux-image"]}/boot/* linux/
-
     # create config.txt
     cat > boot/config.txt << EOF
     start_file=start4.elf
     fixup_file=fixup4.dat
 
     kernel=kernel.img
+    initramfs initramfs followkernel
 
     # How much memory in MB to assign to the GPU on Pi models having
     # 256, 512 or 1024 MB total memory
@@ -73,11 +78,18 @@ buildScript: |
 
     # kernel cmdline
     cat > boot/cmdline.txt << EOF
-    console=tty1 console=ttyAMA0,115200
+    console=tty1 console=ttyAMA0,115200 initrd=/dev/ram0
     EOF
 
+    # rootfs
+    (
+        cd ${BOB_DEP_PATHS["board::rootfs"]}
+        find . | sort | cpio --create --reproducible --format=newc --owner=root:root | gzip
+    ) > initramfs
+
+
 packageVars: [ARCH, BOARD_KERNEL_DTB]
-packageTools: [mcopy, mkimage]
+packageTools: [mcopy]
 packageScript: |
     # first create the boot partiton image file
     fallocate -l 200M boot.img
@@ -86,10 +98,14 @@ packageScript: |
 
     # We use the mtools here because they can easy copy files from host filesystem to a target vfat image file
     # copy file XXX from $1/boot into root directory "::" of vfat image boot.img
-    mcopy -i boot.img $1/linux/dtbs/$LINUX_VERSION/broadcom/${BOARD_KERNEL_DTB}.dtb ::${BOARD_KERNEL_DTB}.dtb
+    mcopy -i boot.img $1/dtbs/$LINUX_VERSION/broadcom/${BOARD_KERNEL_DTB}.dtb ::${BOARD_KERNEL_DTB}.dtb
     mcopy -i boot.img $1/boot/bootcode.bin ::bootcode.bin
-    mcopy -i boot.img $1/boot/config.txt ::config.txt
-    mcopy -i boot.img $1/boot/cmdline.txt ::cmdline.txt
     mcopy -i boot.img $1/boot/fixup4.dat ::fixup4.dat
-    mcopy -i boot.img $1/boot/kernel.img ::kernel.img
     mcopy -i boot.img $1/boot/start4.elf ::start4.elf
+
+    mcopy -i boot.img $1/boot/cmdline.txt ::cmdline.txt
+    mcopy -i boot.img $1/boot/config.txt ::config.txt
+
+    mcopy -i boot.img $1/boot/kernel.img ::kernel.img
+    mcopy -i boot.img $1/initramfs ::initramfs
+

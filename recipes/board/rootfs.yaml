@@ -1,27 +1,21 @@
 depends:
-   - core::busybox
-   - net::dropbear
-   - net::iproute2 
-   - utils::htop
+    - libs::libc-tgt
+    - core::busybox
 
 buildScript: |
-   rm -rf tmp
-   mkdir -p tmp
+    mkdir -p bin dev etc lib mnt proc sbin sys tmp var
 
-   # add default directories and special files
-   pushd tmp
-   mkdir -p dev/pts 
-   mkdir -p etc/init.d 
-   mkdir lib 
-   mkdir mnt 
-   mkdir opt 
-   mkdir proc 
-   mkdir oot 
-   mkdir sys 
-   mkdir mp 
-   mkdir -p var/log
-   popd
+    # copy all files from dependencies into workspace which is rootfs
+    for i in "${@:2}" ; do
+        cp -a $i/* .
+    done
+    
+    ln -sf bin/busybox init
+    mkdir -p dev etc/init.d proc sys
+
+    echo -n $<'initramfs/inittab'> >etc/inittab
+    cp $<<initramfs/rcS>> etc/init.d/rcS
+    chmod 0755 etc/init.d/rcS
 
 packageScript: |
-   cp -anur $1/tmp/* .
-
+    cp -a $1/* .
